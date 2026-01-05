@@ -13,11 +13,48 @@ Social network visualization of tweets of Members of the French Parliament (MPS)
 - **Interactive plotting**: Uses `matplotlib` with widget support for interactive exploration.
 ## Main Components
 
-### Notebook: `Visu_network_clean.ipynb`
+### Notebook: `example.ipynb`
 
 This Jupyter notebook demonstrates the visualization workflow:
 
-1. **Data Loading**: Loads network parameters and adjacency matrices from a pickle file.
+1.  **Data Loading**: Loads network parameters and adjacency matrices from a pickle file.
+2.  **Layer Definition**: Defines the layers of the network using the `Layer` class from `multi_layer_NetViz_fcts.py`.
+3.  **Layout and Styling**: Customizes the layout, colors, and markers for each layer.
+4.  **Visualization**: Creates a `LayeredNetworkGraph` object and renders the 3D visualization.
+
+### Module: `multi_layer_NetViz_fcts.py`
+
+This Python module contains the core classes and functions for creating the multi-layer network visualization:
+
+-   `Layer`: A class to represent a single layer in the network, including its graph, layout, and visual properties.
+-   `LayeredNetworkGraph`: A class that takes a list of `Layer` objects and plots the 3D multi-layer network.
+-   Helper functions for color calculation and marker creation.
+
+## Getting Started
+
+### Prerequisites
+
+-   Python 3.x
+-   Jupyter Notebook or JupyterLab
+-   The required Python packages can be installed using pip:
+
+```bash
+pip install numpy matplotlib networkx
+```
+
+### Usage
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/gas-abel/MultiLayerNetViz.git
+    cd MultiLayerNetViz
+    ```
+2.  Run the example notebook:
+    ```bash
+    jupyter notebook example.ipynb
+    ```
+This will open the notebook in your browser, and you can run the cells to see the visualization.
+
 2. **Graph Construction**: Builds multiple graphs (`g1,g2,...`) representing different layers (e.g., users and topics).
 3. **Node Alignment & Coloring**: Computes node alignments and colors based on network statistics.
 4. **Layout Calculation**: Generates node positions using a convex combination of spring layouts and alignment matrices.
@@ -35,7 +72,7 @@ This Python module contains core functions for:
 
 **Just run the notebook!**
   - This visualization tool is used via a notebook for a more didactical approach of the components, making it easier to understand the workflow.
-  - Open `Visu_network_clean.ipynb` in Jupyter and execute the cells to visualize your bi-layer network.
+  - Open `example.ipynb` in Jupyter and execute the cells to visualize your bi-layer network.
 
 ## Example
 The data included in this repository consists of social network users sharing tweets that contain url shortening services [2].
