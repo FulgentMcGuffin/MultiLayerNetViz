@@ -2,8 +2,8 @@
 
 MultiLayerNetViz is a lightweight Python toolkit for visualizing and analyzing multi-layer networks, with a focus on the study of interacting social and semantic networks. This repository provides a Jupyter notebook and a Python function file to visualize multi-layer networks, particularly useful for understanding complex relationships in social media data. It was initially built to qualitatively analyze the results in [1].
 
-![Multi-layer Network Visualization](images/network_mps_media_normalized.png)
-Social network visualization of tweets of Members of the French Parliament (MPS) and media domains, projected onto an opinion space.
+![Multi-layer Network Visualization](images/parlementaires_pol_landscape.png)
+Social network visualization of tweets of Members of the French Parliament (MPS) and media domains, projected onto an opinion space, data from [3].
 
 ## Features
 
@@ -83,10 +83,16 @@ Edges and node sizes/colors reflect relationships and activity between layers.
 
 ![Example Visualization](images/url_example.png)
 ## References
-- [1] G. Abel, A. Kalogeratos, J. Randon-Furling, and J.-P. Nadal, “Uncovering Social Network Activity Using Joint User and Topic Interaction,” arXiv:2506.12842.
-- [2] N. O. Hodas and K. Lerman, “The Simple Rules of Social Contagion,” Scientiﬁc Reports, vol. 4, no. 1, p. 4343, 2014.
+- [1] G. Abel, A. Kalogeratos, J. Randon-Furling, and J.-P. Nadal, *Uncovering Social Network Activity Using Joint User and Topic Interaction,* arXiv:2506.12842.
+- [2] N. O. Hodas and K. Lerman, *The Simple Rules of Social Contagion,* Scientiﬁc Reports, vol. 4, no. 1, p. 4343, 2014.
+- [3] Antoine Vendeville, Jimena Royo-Letelier, Duncan
+Cassells, Jean-Philippe Cointet, Maxime Crépel, Tim
+Faverjon, Théophile Lenoir, Béatrice Mazoyer, Benjamin Ooghe-Tabanou, Armin Pournaki, Hiroki Yamashita, and Pedro Ramaciotti. *Mapping the political landscape from data traces: multidimensional opinions of users, politicians and media outlets on X,* working paper, 2025.
 
 ## Acknowledgements
+MultiLayerNetViz was presented during the 2025 ARCOM (French authority for media regulation) congress in Paris [see here](https://www.arcom.fr/actualites/quatrieme-journee-detudes-de-larcom-presentation-des-travaux-des-chercheurs-sur-les-medias-audiovisuels-et-numeriques).
+
+To use this code, please cite [1] and acknowledge the use of this visualization tool in your work.
 
 Developed using [NetworkX](https://networkx.org/), [Matplotlib](https://matplotlib.org/), and related scientific Python libraries.
-The original code was created by Paul J. N. Brodersen in https://stackoverflow.com/a/60416989 and adapted here to include further visualization features.
+The original code was created by Paul J. N. Brodersen in https://stackoverflow.com/a/60416989 and adapted here to include further customization and visualization features.
