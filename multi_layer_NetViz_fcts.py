@@ -9,9 +9,9 @@ from mpl_toolkits.mplot3d.art3d import Path3DCollection
 import matplotlib.markers as mmarkers
 from collections import defaultdict
 
-plt.rcParams.update({'text.usetex': True})
+plt.rcParams.update({'text.usetex': True, 'font.family': 'serif', 'font.size': 12})
 
-def mscatter3d(x, y, z, ax=None, m=None, **kw):
+def mscatter3d(x, y, z, ax=None, m=None, vmin=None, vmax=None, **kw):
     """
     Vectorized 3D scatter with multiple marker types.
     Groups points by marker to minimize draw calls.
@@ -48,15 +48,15 @@ def mscatter3d(x, y, z, ax=None, m=None, **kw):
     for marker, group in marker_groups.items():
         scat = ax.scatter(
             group['x'], group['y'], group['z'],
-            marker=marker, c=group['c'], s=group['s'], **kw
+            marker=marker, c=group['c'], s=group['s'], vmin=vmin, vmax=vmax, **kw
         )
         scatters.append(scat)
 
     return scatters
 
-def mscatter(x,y,ax=None, m=None, **kw):
+def mscatter(x,y,ax=None, m=None, vmin=None, vmax=None, **kw):
     if not ax: ax=plt.gca()
-    sc = ax.scatter(x,y,**kw)
+    sc = ax.scatter(x,y, vmin=vmin, vmax=vmax, **kw)
     if (m is not None) and (len(m)==len(x)):
         paths = []
         for marker in m:
@@ -110,13 +110,14 @@ def create_ellipse_marker(angle_deg=0, num_points=100):
 
 class Layer:
     """Represents a single layer in the multi-layer network."""
-    def __init__(self, graph, z_pos=None, label=None, label_pos=None, layout=nx.spring_layout,
+    def __init__(self, graph, z_pos=None, label=None, label_pos=None, label_zdir=None, layout=nx.spring_layout,
                  node_size=50, node_color='C0', edge_color='dimgrey', node_marker='o', node_2d_marker='o',
                  node_label=None, edge_label=None, node_alpha=1.0, edge_alpha=0.5):
         self.graph = graph
         self.z_pos = z_pos
         self.label = label
         self.label_pos = label_pos
+        self.label_zdir = label_zdir
         self.layout = layout
         self.node_positions = None
 
@@ -169,7 +170,7 @@ class LayeredNetworkGraph:
             self._draw_edge_labels(layer)
 
         self._draw_edges_between_layers()
-        self.ax.set_axis_off()
+        # self.ax.set_axis_off()
 
     def _draw_nodes(self, layer):
         nodes = list(layer.graph.nodes())
@@ -225,17 +226,18 @@ class LayeredNetworkGraph:
 
     def _draw_plane(self, layer, *args, **kwargs):
         (xmin, xmax), (ymin, ymax) = self._get_extent(pad=0.1)
-        u = np.linspace(xmin, xmax, 10)
-        v = np.linspace(ymin, ymax, 10)
+        u = np.linspace(xmin, xmax, 5)
+        v = np.linspace(ymin, ymax, 5)
         U, V = np.meshgrid(u, v)
         W = layer.z_pos * np.ones_like(U)
-        self.ax.plot_surface(U, V, W, alpha=0.1, zorder=1, *args, **kwargs)
+        self.ax.plot_surface(U, V, W, alpha=0., zorder=1, *args, **kwargs)
         if layer.label:
             label_pos = layer.label_pos
             if label_pos is not None:
                 xmin, ymin = label_pos
+            label_zdir = layer.label_zdir
             self.ax.text(xmin, ymin, layer.z_pos, layer.label,
-                         horizontalalignment='left', verticalalignment='top', fontsize=14)
+                         horizontalalignment='left', verticalalignment='top', fontsize=14, zdir=label_zdir)
 
     def draw_2d(self, ax=None):
         """Draws all layers flattened into a single 2D plot."""
@@ -273,19 +275,27 @@ class LayeredNetworkGraph:
 
         ax.set_axis_off()
 
-def compute_node_colors(alignment, colormap=plt.cm.tab10):
+def compute_node_colors(alignment, colormap=plt.cm.tab10, vmin=None, vmax=None):
     """
     Computes node colors for two layers based on an alignment matrix.
 
     Args:
         alignment (np.array): N1xN2 matrix aligning nodes from layer 1 to layer 2.
         colormap: Matplotlib colormap.
+        vmin (float, optional): Minimum value for colormap normalization. Defaults to None.
+        vmax (float, optional): Maximum value for colormap normalization. Defaults to None.
 
     Returns:
         tuple: (g1_colors, g2_colors)
     """
     N1, N2 = alignment.shape
-    norm = Normalize(vmin=0, vmax=N2 - 1)
+
+    if vmin is None:
+        vmin = 0
+    if vmax is None:
+        vmax = N2 - 1
+
+    norm = Normalize(vmin=vmin, vmax=vmax)
     g2_colors = [colormap(norm(i)) for i in range(N2)]
     g1_colors = np.dot(alignment, np.array([mcolors.to_rgb(c) for c in g2_colors]))
 
