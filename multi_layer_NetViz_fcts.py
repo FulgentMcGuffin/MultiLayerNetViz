@@ -9,294 +9,163 @@ from mpl_toolkits.mplot3d.art3d import Path3DCollection
 import matplotlib.markers as mmarkers
 from collections import defaultdict
 
-plt.rcParams.update({'text.usetex': True, 'font.family': 'serif', 'font.size': 12})
 
-def mscatter3d(x, y, z, ax=None, m=None, vmin=None, vmax=None, **kw):
-    """
-    Vectorized 3D scatter with multiple marker types.
-    Groups points by marker to minimize draw calls.
-    """
-    if ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+"""
+Plot multi-graphs in 3D. Original Code: https://stackoverflow.com/a/60416989/2912349. Published by paulbrodersen on StackOverflow.
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+import networkx as nx
 
-    if m is None:
-        m = ['o'] * len(x)
-
-    colors = kw.pop('c', None)
-    if colors is None:
-        colors = ['C0'] * len(x)
-    elif isinstance(colors, str) or not hasattr(colors, '__len__'):
-        colors = [colors] * len(x)
-
-    sizes = kw.pop('s', None)
-    if sizes is None:
-        sizes = [100] * len(x)
-    elif not hasattr(sizes, '__len__'):
-        sizes = [sizes] * len(x)
-
-    marker_groups = defaultdict(lambda: {'x': [], 'y': [], 'z': [], 'c': [], 's': []})
-    for xi, yi, zi, mi, ci, si in zip(x, y, z, m, colors, sizes):
-        g = marker_groups[mi]
-        g['x'].append(xi)
-        g['y'].append(yi)
-        g['z'].append(zi)
-        g['c'].append(ci)
-        g['s'].append(si)
-
-    scatters = []
-    for marker, group in marker_groups.items():
-        scat = ax.scatter(
-            group['x'], group['y'], group['z'],
-            marker=marker, c=group['c'], s=group['s'], vmin=vmin, vmax=vmax, **kw
-        )
-        scatters.append(scat)
-
-    return scatters
-
-def mscatter(x,y,ax=None, m=None, vmin=None, vmax=None, **kw):
-    if not ax: ax=plt.gca()
-    sc = ax.scatter(x,y, vmin=vmin, vmax=vmax, **kw)
-    if (m is not None) and (len(m)==len(x)):
-        paths = []
-        for marker in m:
-            if isinstance(marker, mmarkers.MarkerStyle):
-                marker_obj = marker
-            else:
-                marker_obj = mmarkers.MarkerStyle(marker)
-            path = marker_obj.get_path().transformed(
-                        marker_obj.get_transform())
-            paths.append(path)
-        sc.set_paths(paths)
-    return sc
-
-# Display the nodes with the right perspective
-def create_parallelogram_marker(angle_deg=0):
-    # Base parallelogram vertices (centered at origin)
-    base_vertices = np.array([
-        [-0.1, -0.5], # Bottom left
-        [ 0.9, -0.5], # Bottom right
-        [ 0.3,  0.5], # Top right
-        [-0.7,  0.5], # Top left
-        [-0.1, -0.5]  # Close the shape
-    ])
-
-    # Convert angle to radians and create rotation matrix
-    angle_rad = np.deg2rad(angle_deg)
-    rotation_matrix = np.array([
-        [np.cos(angle_rad), -np.sin(angle_rad)],
-        [np.sin(angle_rad),  np.cos(angle_rad)]
-    ])
-
-    # Rotate vertices
-    rotated_vertices = base_vertices @ rotation_matrix.T
-
-    # Create path
-    return Path(rotated_vertices, closed=True)
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 
-def create_ellipse_marker(angle_deg=0, num_points=100):
-    """Creates a rotated ellipse marker for plotting."""
-    t = np.linspace(0, 2 * np.pi, num_points)
-    x = 0.5 * np.cos(t)
-    y = 0.25 * np.sin(t)
-    verts = np.column_stack((x, y))
+class LayeredNetworkGraph(object):
 
-    angle_rad = np.deg2rad(angle_deg)
-    R = np.array([[np.cos(angle_rad), -np.sin(angle_rad)],
-                  [np.sin(angle_rad),  np.cos(angle_rad)]])
-    rotated_verts = verts @ R.T
-    return Path(rotated_verts, closed=True)
+    def __init__(self, graphs, node_labels=None, layout=nx.spring_layout, ax=None):
+        """Given an ordered list of graphs [g1, g2, ..., gn] that represent
+        different layers in a multi-layer network, plot the network in
+        3D with the different layers separated along the z-axis.
 
-class Layer:
-    """Represents a single layer in the multi-layer network."""
-    def __init__(self, graph, z_pos=None, label=None, label_pos=None, label_zdir=None, layout=nx.spring_layout,
-                 node_size=50, node_color='C0', edge_color='dimgrey', node_marker='o', node_2d_marker='o',
-                 node_label=None, edge_label=None, node_alpha=1.0, edge_alpha=0.5):
-        self.graph = graph
-        self.z_pos = z_pos
-        self.label = label
-        self.label_pos = label_pos
-        self.label_zdir = label_zdir
+        Within a layer, the corresponding graph defines the connectivity.
+        Between layers, nodes in subsequent layers are connected if
+        they have the same node ID.
+
+        Arguments:
+        ----------
+        graphs : list of networkx.Graph objects
+            List of graphs, one for each layer.
+
+        node_labels : dict node ID : str label or None (default None)
+            Dictionary mapping nodes to labels.
+            If None is provided, nodes are not labelled.
+
+        layout_func : function handle (default networkx.spring_layout)
+            Function used to compute the layout.
+
+        ax : mpl_toolkits.mplot3d.Axes3d instance or None (default None)
+            The axis to plot to. If None is given, a new figure and a new axis are created.
+
+        """
+
+        # book-keeping
+        self.graphs = graphs
+        self.total_layers = len(graphs)
+
+        self.node_labels = node_labels
         self.layout = layout
-        self.node_positions = None
 
-        n_nodes = len(graph.nodes)
-        self.node_size = self._expand_param(node_size, n_nodes)
-        self.node_color = self._expand_param(node_color, n_nodes)
-        self.node_marker = self._expand_param(node_marker, n_nodes)
-        self.node_2d_marker = self._expand_param(node_2d_marker, n_nodes)
-        self.node_alpha = self._expand_param(node_alpha, n_nodes)
-
-        n_edges = len(graph.edges)
-        self.edge_alpha = self._expand_param(edge_alpha, n_edges)
-        self.edge_color = self._expand_param(edge_color, n_edges)
-        self.node_label = node_label if node_label is not None else {}
-        self.edge_label = edge_label if edge_label is not None else {}
-
-        self.node_positions = self.compute_layout()
-    def _expand_param(self, param, n_items):
-        if hasattr(param, '__len__') and not isinstance(param, str) and len(param) == n_items:
-            return param
-        return [param] * n_items
-
-    def compute_layout(self, *args, **kwargs):
-        """Computes the 2D layout for the layer's nodes."""
-        pos = self.layout(self.graph, *args, **kwargs)
-        self.node_positions = {node: (*coords, self.z_pos) for node, coords in pos.items()}
-
-class LayeredNetworkGraph:
-    """Plots a multi-layer network in 3D."""
-    def __init__(self, layers, interlayer_edges=None, ax=None):
-        self.layers = layers
-        self.interlayer_edges = interlayer_edges if interlayer_edges is not None else []
         if ax:
             self.ax = ax
         else:
-            fig = plt.figure(figsize=(10, 10))
+            fig = plt.figure()
             self.ax = fig.add_subplot(111, projection='3d')
 
+        # create internal representation of nodes and edges
+        self.get_nodes()
+        self.get_edges_within_layers()
+        self.get_edges_between_layers()
+
+        # compute layout and plot
+        self.get_node_positions()
+        self.draw()
+
+
+    def get_nodes(self):
+        """Construct an internal representation of nodes with the format (node ID, layer)."""
+        self.nodes = []
+        for z, g in enumerate(self.graphs):
+            self.nodes.extend([(node, z) for node in g.nodes()])
+
+
+    def get_edges_within_layers(self):
+        """Remap edges in the individual layers to the internal representations of the node IDs."""
+        self.edges_within_layers = []
+        for z, g in enumerate(self.graphs):
+            self.edges_within_layers.extend([((source, z), (target, z)) for source, target in g.edges()])
+
+
+    def get_edges_between_layers(self):
+        """Determine edges between layers. Nodes in subsequent layers are
+        thought to be connected if they have the same ID."""
+        self.edges_between_layers = []
+        for z1, g in enumerate(self.graphs[:-1]):
+            z2 = z1 + 1
+            h = self.graphs[z2]
+            shared_nodes = set(g.nodes()) & set(h.nodes())
+            self.edges_between_layers.extend([((node, z1), (node, z2)) for node in shared_nodes])
+
+
+    def get_node_positions(self, *args, **kwargs):
+        """Get the node positions in the layered layout."""
+        # What we would like to do, is apply the layout function to a combined, layered network.
+        # However, networkx layout functions are not implemented for the multi-dimensional case.
+        # Futhermore, even if there was such a layout function, there probably would be no straightforward way to
+        # specify the planarity requirement for nodes within a layer.
+        # Therefor, we compute the layout for the full network in 2D, and then apply the
+        # positions to the nodes in all planes.
+        # For a force-directed layout, this will approximately do the right thing.
+        # TODO: implement FR in 3D with layer constraints.
+
+        composition = self.graphs[0]
+        for h in self.graphs[1:]:
+            composition = nx.compose(composition, h)
+
+        pos = self.layout(composition, *args, **kwargs)
+
+        self.node_positions = dict()
+        for z, g in enumerate(self.graphs):
+            self.node_positions.update({(node, z) : (*pos[node], z) for node in g.nodes()})
+
+
+    def draw_nodes(self, nodes, *args, **kwargs):
+        x, y, z = zip(*[self.node_positions[node] for node in nodes])
+        self.ax.scatter(x, y, z, *args, **kwargs)
+
+
+    def draw_edges(self, edges, *args, **kwargs):
+        segments = [(self.node_positions[source], self.node_positions[target]) for source, target in edges]
+        line_collection = Line3DCollection(segments, *args, **kwargs)
+        self.ax.add_collection3d(line_collection)
+
+
+    def get_extent(self, pad=0.1):
+        xyz = np.array(list(self.node_positions.values()))
+        xmin, ymin, _ = np.min(xyz, axis=0)
+        xmax, ymax, _ = np.max(xyz, axis=0)
+        dx = xmax - xmin
+        dy = ymax - ymin
+        return (xmin - pad * dx, xmax + pad * dx), \
+            (ymin - pad * dy, ymax + pad * dy)
+
+
+    def draw_plane(self, z, *args, **kwargs):
+        (xmin, xmax), (ymin, ymax) = self.get_extent(pad=0.1)
+        u = np.linspace(xmin, xmax, 10)
+        v = np.linspace(ymin, ymax, 10)
+        U, V = np.meshgrid(u ,v)
+        W = z * np.ones_like(U)
+        self.ax.plot_surface(U, V, W, *args, **kwargs)
+
+
+    def draw_node_labels(self, node_labels, *args, **kwargs):
+        for node, z in self.nodes:
+            if node in node_labels:
+                ax.text(*self.node_positions[(node, z)], node_labels[node], *args, **kwargs)
+
+
     def draw(self):
-        """Draws the entire multi-layer network."""
-        for i,layer in enumerate(self.layers):
-            if layer.z_pos is None:
-                layer.z_pos = i # Default z position based on the layer index
-            layer.compute_layout()
-        for layer in self.layers:
-            self._draw_plane(layer)
-            self._draw_nodes(layer)
-            self._draw_edges_within_layer(layer)
-            self._draw_node_labels(layer)
-            self._draw_edge_labels(layer)
 
-        self._draw_edges_between_layers()
-        # self.ax.set_axis_off()
+        self.draw_edges(self.edges_within_layers,  color='k', alpha=0.3, linestyle='-', zorder=2)
+        self.draw_edges(self.edges_between_layers, color='k', alpha=0.3, linestyle='--', zorder=2)
 
-    def _draw_nodes(self, layer):
-        nodes = list(layer.graph.nodes())
-        x, y, z = zip(*[layer.node_positions[node] for node in nodes])
+        for z in range(self.total_layers):
+            self.draw_plane(z, alpha=0.2, zorder=1)
+            self.draw_nodes([node for node in self.nodes if node[1]==z], s=300, zorder=3)
 
-        # Map node properties from dicts if they are dicts
-        node_colors = [layer.node_color[node] if isinstance(layer.node_color, dict) else layer.node_color[i] for i, node in enumerate(nodes)]
-        node_sizes = [layer.node_size[node] if isinstance(layer.node_size, dict) else layer.node_size[i] for i, node in enumerate(nodes)]
-        node_markers = [layer.node_marker[node] if isinstance(layer.node_marker, dict) else layer.node_marker[i] for i, node in enumerate(nodes)]
-        node_alphas = [layer.node_alpha[node] if isinstance(layer.node_alpha, dict) else layer.node_alpha[i] for i, node in enumerate(nodes)]
-
-        mscatter3d(x, y, z, ax=self.ax, m=node_markers, c=node_colors, s=node_sizes, alpha=node_alphas, zorder=99)
-
-    def _draw_edges_within_layer(self, layer):
-        segments = [(layer.node_positions[u], layer.node_positions[v]) for u, v in layer.graph.edges()]
-        line_collection = Line3DCollection(segments, color=layer.edge_color, alpha=layer.edge_alpha, linestyle='-', zorder=1)
-        self.ax.add_collection3d(line_collection)
-
-    def _draw_edges_between_layers(self):
-        if not self.interlayer_edges:
-            return
-
-        segments = []
-        for u_id, v_id, z1, z2 in self.interlayer_edges:
-            pos1 = self.layers[z1].node_positions[u_id]
-            pos2 = self.layers[z2].node_positions[v_id]
-            segments.append((pos1, pos2))
-
-        line_collection = Line3DCollection(segments, color='dimgrey', alpha=0.1, linestyle='--', zorder=1)
-        self.ax.add_collection3d(line_collection)
-
-    def _draw_node_labels(self, layer):
-        for node, label in layer.node_label.items():
-            if node in layer.node_positions:
-                color_text = 'black' if np.mean(mcolors.to_rgb(layer.node_color[node])) > 0.5 else 'white'
-                self.ax.text(*layer.node_positions[node], label,
-                             horizontalalignment='center', verticalalignment='center', color=color_text, zorder=100)
-
-    def _draw_edge_labels(self, layer):
-        for (u, v), label in layer.edge_label.items():
-            pos_u = layer.node_positions[u]
-            pos_v = layer.node_positions[v]
-            pos_middle = [(3 * pos_u[i] + pos_v[i]) / 4 for i in range(3)]
-            self.ax.text(*pos_middle, label)
-
-    def _get_extent(self, pad=0.1):
-        all_pos = np.array([pos for layer in self.layers for pos in layer.node_positions.values()])
-        xmin, ymin, _ = np.min(all_pos, axis=0)
-        xmax, ymax, _ = np.max(all_pos, axis=0)
-        dx = xmax - xmin if xmax > xmin else 1
-        dy = ymax - ymin if ymax > ymin else 1
-        return (xmin - pad * dx, xmax + pad * dx), (ymin - pad * dy, ymax + pad * dy)
-
-    def _draw_plane(self, layer, *args, **kwargs):
-        (xmin, xmax), (ymin, ymax) = self._get_extent(pad=0.1)
-        u = np.linspace(xmin, xmax, 5)
-        v = np.linspace(ymin, ymax, 5)
-        U, V = np.meshgrid(u, v)
-        W = layer.z_pos * np.ones_like(U)
-        self.ax.plot_surface(U, V, W, alpha=0., zorder=1, *args, **kwargs)
-        if layer.label:
-            label_pos = layer.label_pos
-            if label_pos is not None:
-                xmin, ymin = label_pos
-            label_zdir = layer.label_zdir
-            self.ax.text(xmin, ymin, layer.z_pos, layer.label,
-                         horizontalalignment='left', verticalalignment='top', fontsize=14, zdir=label_zdir)
-
-    def draw_2d(self, ax=None):
-        """Draws all layers flattened into a single 2D plot."""
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(10, 10))
-
-        for layer in self.layers:
-            if layer.node_positions is None:
-                layer.compute_layout()
-
-            # Draw edges
-            for i,uv in enumerate(layer.graph.edges()):
-                u, v = uv
-                pos_u = layer.node_positions[u]
-                pos_v = layer.node_positions[v]
-                ax.plot([pos_u[0], pos_v[0]], [pos_u[1], pos_v[1]], color=layer.edge_color[i], alpha=0.7, linestyle='-', zorder=1)
-
-            # Draw nodes
-            nodes = list(layer.graph.nodes())
-            x, y, _ = zip(*[layer.node_positions[node] for node in nodes])
-
-            node_colors = [layer.node_color[node] if isinstance(layer.node_color, dict) else layer.node_color[i] for i, node in enumerate(nodes)]
-            node_sizes = [layer.node_size[node] if isinstance(layer.node_size, dict) else layer.node_size[i] for i, node in enumerate(nodes)]
-            node_markers = [layer.node_2d_marker[node] if isinstance(layer.node_2d_marker, dict) else layer.node_2d_marker[i] for i, node in enumerate(nodes)]
-            node_alphas = [layer.node_alpha[node] if isinstance(layer.node_alpha, dict) else layer.node_alpha[i] for i, node in enumerate(nodes)]
-
-            mscatter(x, y, ax=ax, m=node_markers, c=node_colors, s=node_sizes, alpha=node_alphas, zorder=99)
-
-            # Draw node labels
-            for node, label in layer.node_label.items():
-                if node in layer.node_positions:
-                    color_text = 'black' if np.mean(mcolors.to_rgb(layer.node_color[node])) > 0.5 else 'white'
-                    ax.text(layer.node_positions[node][0], layer.node_positions[node][1], label,
-                                 horizontalalignment='center', verticalalignment='center', color=color_text, zorder=100)
-
-        ax.set_axis_off()
-
-def compute_node_colors(alignment, colormap=plt.cm.tab10, vmin=None, vmax=None):
-    """
-    Computes node colors for two layers based on an alignment matrix.
-
-    Args:
-        alignment (np.array): N1xN2 matrix aligning nodes from layer 1 to layer 2.
-        colormap: Matplotlib colormap.
-        vmin (float, optional): Minimum value for colormap normalization. Defaults to None.
-        vmax (float, optional): Maximum value for colormap normalization. Defaults to None.
-
-    Returns:
-        tuple: (g1_colors, g2_colors)
-    """
-    N1, N2 = alignment.shape
-
-    if vmin is None:
-        vmin = 0
-    if vmax is None:
-        vmax = N2 - 1
-
-    norm = Normalize(vmin=vmin, vmax=vmax)
-    g2_colors = [colormap(norm(i)) for i in range(N2)]
-    g1_colors = np.dot(alignment, np.array([mcolors.to_rgb(c) for c in g2_colors]))
-
-    return g1_colors, g2_colors
+        if self.node_labels:
+            self.draw_node_labels(self.node_labels,
+                                  horizontalalignment='center',
+                                  verticalalignment='center',
+                                  zorder=100)
