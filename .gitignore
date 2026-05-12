@@ -56,3 +56,8 @@ checkpoints/
 outputs/
 runs/
 .DS_Store
+
+
+# ignore MultiLayerNetViz_Chapter folder
+MultiLayerNetViz_Chapter/
+old/
