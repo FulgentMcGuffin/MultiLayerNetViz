@@ -1,3 +1,15 @@
+
+
+
+# MultiLayerNetViz: A Python library for visualizing multi-layer networks in 3D and 2D. By Gaspard Abel, 2025.
+# SPDX-License-Identifier: CC-BY-4.0
+#
+# This work is licensed under the Creative Commons Attribution 4.0
+# International License (CC BY 4.0).
+# You may obtain a copy of the License at:
+# https://creativecommons.org/licenses/by/4.0/
+# Adapted from https://stackoverflow.com/a/60416989/2912349. Published by paulbrodersen under CC BY 4.0
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -409,5 +421,3 @@ def compute_node_colors(alignment, colormap=plt.cm.tab10, vmin=None, vmax=None):
     g1_colors = np.dot(alignment, np.array([mcolors.to_rgb(c) for c in g2_colors]))
 
     return g1_colors, g2_colors
-
-
