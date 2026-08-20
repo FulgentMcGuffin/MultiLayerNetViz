@@ -44,6 +44,16 @@ Tabular data uses [Polars](https://pola.rs/), not pandas. Dense layouts and plot
 uv sync
 ```
 
+Install as a library from Git:
+
+```bash
+uv add git+https://github.com/FulgentMcGuffin/MultiLayerNetViz.git
+```
+
+```python
+from multi_layer_NetViz_fcts import Layer, LayeredNetworkGraph
+```
+
 ### Usage
 
 1.  Clone the repository:
