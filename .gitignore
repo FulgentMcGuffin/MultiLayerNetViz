@@ -10,15 +10,39 @@ __pycache__/
 dist/
 build/
 *.so
+*$py.class
 
 # Jupyter Notebook
 .ipynb_checkpoints
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
 *.env
+
+# C extensions
+*.so
+
+# Mex
+.mex/
+
+# Cursor
+.cursor/
+
+.secrets/
+.secrets
+
+# Claude
+.claude/
+CLAUDE.md
+
+# Grok
+.grok/
+
+# Gemini
+.gemini/
 
 # VS Code
 .vscode/

@@ -11,6 +11,7 @@
 # Adapted from https://stackoverflow.com/a/60416989/2912349. Published by paulbrodersen under CC BY 4.0
 
 import numpy as np
+import polars as pl
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.colors import Normalize
@@ -421,3 +422,78 @@ def compute_node_colors(alignment, colormap=plt.cm.tab10, vmin=None, vmax=None):
     g1_colors = np.dot(alignment, np.array([mcolors.to_rgb(c) for c in g2_colors]))
 
     return g1_colors, g2_colors
+
+
+def adjacency_to_edges(
+    adj: np.ndarray,
+    *,
+    threshold: float = 0.0,
+    include_self_loops: bool = False,
+) -> pl.DataFrame:
+    """Convert a dense adjacency matrix into a Polars edge table.
+
+    Returns columns ``source``, ``target``, and ``weight`` for entries strictly
+    above ``threshold``. Linear-algebra layouts still use NumPy; this is for
+    tabular edge filtering, labels, and arrows.
+    """
+    adj = np.asarray(adj)
+    if adj.ndim != 2 or adj.shape[0] != adj.shape[1]:
+        raise ValueError("adj must be a square 2D array")
+
+    sources, targets = np.nonzero(adj > threshold)
+    weights = adj[sources, targets]
+    if not include_self_loops:
+        keep = sources != targets
+        sources, targets, weights = sources[keep], targets[keep], weights[keep]
+
+    return pl.DataFrame({
+        "source": sources.astype(np.int64, copy=False),
+        "target": targets.astype(np.int64, copy=False),
+        "weight": weights.astype(np.float64, copy=False),
+    })
+
+
+def node_activity(event_matrix: np.ndarray, *, axis: str) -> pl.DataFrame:
+    """Sum a 2D event matrix into a Polars table of per-node activity.
+
+    ``axis='columns'`` sums down each column (one total per column index).
+    ``axis='rows'`` sums across each row (one total per row index).
+    """
+    frame = pl.DataFrame(np.asarray(event_matrix))
+    if axis == "columns":
+        totals = frame.sum().transpose(include_header=False, column_names=["activity"])
+        return totals.with_row_index("id")
+    if axis == "rows":
+        return frame.select(pl.sum_horizontal(pl.all()).alias("activity")).with_row_index("id")
+    raise ValueError("axis must be 'rows' or 'columns'")
+
+
+def top_k_partners(
+    scores: np.ndarray,
+    k: int = 1,
+    *,
+    row_name: str = "row",
+    col_name: str = "col",
+    value_name: str = "score",
+) -> pl.DataFrame:
+    """Return the ``k`` highest-scoring row partners for each column.
+
+    ``scores`` is a dense 2D array (rows × columns). The result is a long
+    Polars table with columns ``row_name``, ``col_name``, and ``value_name``.
+    """
+    if k < 1:
+        raise ValueError("k must be >= 1")
+    scores = np.asarray(scores)
+    if scores.ndim != 2:
+        raise ValueError("scores must be a 2D array")
+
+    n_cols = scores.shape[1]
+    return (
+        pl.DataFrame(scores, schema=[str(i) for i in range(n_cols)])
+        .with_row_index(row_name)
+        .unpivot(index=row_name, variable_name=col_name, value_name=value_name)
+        .with_columns(pl.col(col_name).cast(pl.Int64))
+        .sort(value_name, descending=True)
+        .group_by(col_name, maintain_order=True)
+        .head(k)
+    )

@@ -1,0 +1,17 @@
+[project]
+name = "multilayer-netviz"
+version = "0.1.0"
+description = "Visualize and analyze multi-layer networks in 3D and 2D."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "ipykernel>=6.29",
+    "jupyter>=1.1",
+    "matplotlib>=3.10",
+    "networkx>=3.4",
+    "numpy>=2.2",
+    "polars>=1.31",
+]
+
+[tool.uv]
+package = false

@@ -34,12 +34,14 @@ This Python module contains the core classes and functions for creating the mult
 
 ### Prerequisites
 
--   Python 3.x
--   Jupyter Notebook or JupyterLab
--   The required Python packages can be installed using pip:
+-   Python 3.13
+-   [uv](https://docs.astral.sh/uv/) for environment and package management
+-   Jupyter Notebook or JupyterLab (installed by `uv sync`)
+
+Tabular data uses [Polars](https://pola.rs/), not pandas. Dense layouts and plotting still use NumPy.
 
 ```bash
-pip install numpy matplotlib networkx
+uv sync
 ```
 
 ### Usage
@@ -49,9 +51,10 @@ pip install numpy matplotlib networkx
     git clone https://github.com/gas-abel/MultiLayerNetViz.git
     cd MultiLayerNetViz
     ```
-2.  Run the example notebook:
+2.  Install dependencies and run the example notebook:
     ```bash
-    jupyter notebook example.ipynb
+    uv sync
+    uv run jupyter notebook example.ipynb
     ```
 This will open the notebook in your browser, and you can run the cells to see the visualization.
 
@@ -72,7 +75,7 @@ This Python module contains core functions for:
 
 **Just run the notebook!**
   - This visualization tool is used via a notebook for a more didactical approach of the components, making it easier to understand the workflow.
-  - Open `example.ipynb` in Jupyter and execute the cells to visualize your bi-layer network.
+  - After `uv sync`, open `example.ipynb` with `uv run jupyter notebook example.ipynb` and execute the cells to visualize your bi-layer network.
 
 ## Example
 The data included in this repository consists of social network users sharing tweets that contain url shortening services [2].
@@ -94,5 +97,5 @@ MultiLayerNetViz was presented during the 2025 ARCOM (French authority for media
 
 To use this code, please cite [1] and acknowledge the use of this visualization tool in your work.
 
-Developed using [NetworkX](https://networkx.org/), [Matplotlib](https://matplotlib.org/), and related scientific Python libraries.
+Developed using [NetworkX](https://networkx.org/), [Matplotlib](https://matplotlib.org/), [Polars](https://pola.rs/), and related scientific Python libraries.
 The original code was created by Paul J. N. Brodersen in https://stackoverflow.com/a/60416989 and adapted here to include further customization and visualization features.
