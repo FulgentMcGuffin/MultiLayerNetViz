@@ -70,33 +70,38 @@ This will open the notebook in your browser, and you can run the cells to see th
 
 ### Interactive Dash app
 
-The stacked multiplex can be explored in the browser with [Dash](https://dash.plotly.com/) and [Plotly](https://plotly.com/python/). Layers are yield-curve tenors; nodes are issuers (countries). Intra-layer edges are colored blue–white–red by connection strength; grey verticals are inter-layer links.
+`app.py` is a general 3D multiplex explorer: any number of layers, shared node identities across layers, intra-layer edges, and inter-layer edges. The bundled yield-curve pickle is only a demo; swap in your own graph with the same structure.
 
-![Interactive yield-curve multiplex in Dash](images/yc_multiplex.png)
+![Interactive multiplex in Dash](images/yc_multiplex.png)
 
-*Interactive Dash app: four tenor networks (Y001p0, Y005p0, Y010p0, Y030p0) in 3D. Click a node or an edge midpoint to inspect it; the intra- and inter-layer tables below the figure are Polars edge frames. Screenshot of `uv run python app.py`.*
+*Example session of the Dash app (here: country issuers × yield-curve tenors). The same UI works for any multiplex that follows the data format below.*
+
+**Data format.** Supply a pickle at `resources/data/multilayer_network.pkl` (or point `DATA_PATH` in `app.py` at your file) with a NetworkX graph under the key `"graph"`:
+
+- **Nodes:** `(entity, layer)` tuples — e.g. `(user, topic)`, `(issuer, tenor)`, `(protein, condition)`.
+- **Intra-layer edges:** `layer="intra"` (or omit `inter`), same layer on both ends, plus a numeric `weight`.
+- **Inter-layer edges:** `layer="inter"`, typically the same entity on two layers, plus `weight`.
+
+Polars tables (`nodes`, `intra_edges`, `inter_edges`) are built from that graph in `multiplex_data.py`.
 
 **Start up**
-
-1. Place the multiplex pickle at `resources/data/multilayer_network.pkl` (a NetworkX graph with `(issuer, term)` nodes).
-2. From the repository root:
 
 ```bash
 uv sync
 uv run python app.py
 ```
 
-3. Open [http://127.0.0.1:8050](http://127.0.0.1:8050) in a browser.
+Open [http://127.0.0.1:8050](http://127.0.0.1:8050).
 
 **Use**
 
-- **Add or remove networks:** check or uncheck terms in the left-hand list. The 3D view and both tables update to the visible layers.
-- **Inspect a node or edge:** click a node, or the small marker at the midpoint of an intra- or inter-layer edge. Details appear in the Selection panel.
-- **Jump to a table row:** double-click the same node or edge midpoint (two clicks on the same point within about half a second). The matching intra- or inter-layer row is selected and brought into view. For a node, that is the first table row involving that issuer on that layer.
-- **Rotate / zoom:** drag and scroll in the 3D view (Plotly camera).
-- **Tables:** Intra-layer edges and Inter-layer edges under the figure are the current Polars frames (`source_issuer`, `target_issuer`, `term` / `term_from`–`term_to`, `weight`). Pandas is not used.
+- **Layers:** check or uncheck names in the left-hand list to add or remove networks. The 3D view and both tables follow the visible set.
+- **Inspect:** click a node, or the marker at the midpoint of an intra- or inter-layer edge. Details appear in the Selection panel.
+- **Jump to a table row:** double-click the same node or edge (two clicks on the same point shortly after each other). An edge opens its exact row; a node opens the first row that includes that entity on that layer.
+- **Camera:** drag and scroll in the 3D view.
+- **Tables:** Intra-layer and Inter-layer grids under the figure are the current Polars frames (pandas is not used).
 
-Helper modules: `multiplex_data.py` (Polars extractors), `multiplex_plotly.py` (figure), `app.py` (Dash UI). The static Matplotlib figure in `example.ipynb` is unchanged.
+Code: `multiplex_data.py` (extractors), `multiplex_plotly.py` (figure), `app.py` (UI). Static Matplotlib figures in `example.ipynb` are unchanged.
 
 2. **Graph Construction**: Builds multiple graphs (`g1,g2,...`) representing different layers (e.g., users and topics).
 3. **Node Alignment & Coloring**: Computes node alignments and colors based on network statistics.

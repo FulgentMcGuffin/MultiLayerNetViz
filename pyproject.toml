@@ -9,20 +9,18 @@ description = "Visualize and analyze multi-layer networks in 3D and 2D."
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "dash>=4.4.1",
     "ipykernel>=6.29",
     "jupyter>=1.1",
     "matplotlib>=3.10",
     "networkx>=3.4",
     "numpy>=2.2",
-    "plotly>=6.9.0",
     "polars>=1.31",
     "scipy>=1.18.0",
 ]
 
 # Ship the single module; do not autodiscover old/, images/, params_url/.
 [tool.setuptools]
-py-modules = ["multi_layer_NetViz_fcts", "multiplex_data", "multiplex_plotly"]
+py-modules = ["multi_layer_NetViz_fcts"]
 
 [tool.uv]
 package = true
