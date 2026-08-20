@@ -68,6 +68,36 @@ from multi_layer_NetViz_fcts import Layer, LayeredNetworkGraph
     ```
 This will open the notebook in your browser, and you can run the cells to see the visualization.
 
+### Interactive Dash app
+
+The stacked multiplex can be explored in the browser with [Dash](https://dash.plotly.com/) and [Plotly](https://plotly.com/python/). Layers are yield-curve tenors; nodes are issuers (countries). Intra-layer edges are colored blue–white–red by connection strength; grey verticals are inter-layer links.
+
+![Interactive yield-curve multiplex in Dash](images/yc_multiplex.png)
+
+*Interactive Dash app: four tenor networks (Y001p0, Y005p0, Y010p0, Y030p0) in 3D. Click a node or an edge midpoint to inspect it; the intra- and inter-layer tables below the figure are Polars edge frames. Screenshot of `uv run python app.py`.*
+
+**Start up**
+
+1. Place the multiplex pickle at `resources/data/multilayer_network.pkl` (a NetworkX graph with `(issuer, term)` nodes).
+2. From the repository root:
+
+```bash
+uv sync
+uv run python app.py
+```
+
+3. Open [http://127.0.0.1:8050](http://127.0.0.1:8050) in a browser.
+
+**Use**
+
+- **Add or remove networks:** check or uncheck terms in the left-hand list. The 3D view and both tables update to the visible layers.
+- **Inspect a node or edge:** click a node, or the small marker at the midpoint of an intra- or inter-layer edge. Details appear in the Selection panel.
+- **Jump to a table row:** double-click the same node or edge midpoint (two clicks on the same point within about half a second). The matching intra- or inter-layer row is selected and brought into view. For a node, that is the first table row involving that issuer on that layer.
+- **Rotate / zoom:** drag and scroll in the 3D view (Plotly camera).
+- **Tables:** Intra-layer edges and Inter-layer edges under the figure are the current Polars frames (`source_issuer`, `target_issuer`, `term` / `term_from`–`term_to`, `weight`). Pandas is not used.
+
+Helper modules: `multiplex_data.py` (Polars extractors), `multiplex_plotly.py` (figure), `app.py` (Dash UI). The static Matplotlib figure in `example.ipynb` is unchanged.
+
 2. **Graph Construction**: Builds multiple graphs (`g1,g2,...`) representing different layers (e.g., users and topics).
 3. **Node Alignment & Coloring**: Computes node alignments and colors based on network statistics.
 4. **Layout Calculation**: Generates node positions using a convex combination of spring layouts and alignment matrices.
@@ -107,5 +137,5 @@ MultiLayerNetViz was presented during the 2025 ARCOM (French authority for media
 
 To use this code, please cite [1] and acknowledge the use of this visualization tool in your work.
 
-Developed using [NetworkX](https://networkx.org/), [Matplotlib](https://matplotlib.org/), [Polars](https://pola.rs/), and related scientific Python libraries.
+Developed using [NetworkX](https://networkx.org/), [Matplotlib](https://matplotlib.org/), [Polars](https://pola.rs/), [Plotly](https://plotly.com/python/), [Dash](https://dash.plotly.com/), and related scientific Python libraries.
 The original code was created by Paul J. N. Brodersen in https://stackoverflow.com/a/60416989 and adapted here to include further customization and visualization features.

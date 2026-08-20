@@ -74,8 +74,16 @@ def mscatter3d(x, y, z, ax=None, m=None, vmin=None, vmax=None, **kw):
     elif len(alphas) != n_points:
         raise ValueError("Length of alpha list must match number of points")
 
-    marker_groups = defaultdict(lambda: {'x': [], 'y': [], 'z': [], 'c': [], 's': [], 'm': [], 'a': []})
-    for xi, yi, zi, mi, ci, si, ai in zip(x, y, z, m, colors, sizes, alphas):
+    edgecolors = kw.pop('edgecolors', kw.pop('edgecolor', None))
+    if edgecolors is None:
+        edgecolors = ['none'] * n_points
+    elif isinstance(edgecolors, str) or not hasattr(edgecolors, '__len__'):
+        edgecolors = [edgecolors] * n_points
+    elif len(edgecolors) != n_points:
+        raise ValueError("Length of edgecolors must match number of points")
+
+    marker_groups = defaultdict(lambda: {'x': [], 'y': [], 'z': [], 'c': [], 's': [], 'm': [], 'a': [], 'e': []})
+    for xi, yi, zi, mi, ci, si, ai, ei in zip(x, y, z, m, colors, sizes, alphas, edgecolors):
         g = marker_groups[mi]
         g['x'].append(xi)
         g['y'].append(yi)
@@ -84,16 +92,16 @@ def mscatter3d(x, y, z, ax=None, m=None, vmin=None, vmax=None, **kw):
         g['c'].append(ci)
         g['s'].append(si)
         g['a'].append(ai)
-
+        g['e'].append(ei)
 
     scatters = []
     for marker, group in marker_groups.items():
-        # Use a scalar alpha when all entries are equal; otherwise use per-point alpha.
-        group_alpha = group['a'] #[0] if len(set(group['a'])) == 1 else group['a']
+        unique_alpha = set(group['a'])
+        group_alpha = group['a'][0] if len(unique_alpha) == 1 else group['a']
         scat = ax.scatter(
             group['x'], group['y'], group['z'],
             marker=group['m'][0], c=group['c'], s=group['s'], alpha=group_alpha,
-            vmin=vmin, vmax=vmax, **kw
+            edgecolors=group['e'], vmin=vmin, vmax=vmax, **kw
         )
         scatters.append(scat)
 
@@ -158,7 +166,9 @@ class Layer:
     def __init__(self, graph, z_pos=None, label=None, label_pos=None, label_zdir=None, layout=nx.spring_layout,
                  node_size=50, node_color='C0', edge_color='dimgrey', node_marker='o', node_2d_marker='o',
                  node_label=None, edge_label=None, node_alpha=1.0, edge_alpha=0.5, edge_arrows=None,
-                 plane_alpha=0.1, text_color='black'):
+                 plane_alpha=0.1, plane_color=None, text_color='black', label_fontsize=12,
+                 plane_label_fontsize=14, label_fontfamily=None,
+                 node_edgecolor='none', node_edgewidth=0.0):
         self.graph = graph
         self.z_pos = z_pos
         self.label = label
@@ -173,11 +183,17 @@ class Layer:
         self.node_marker = self._expand_param(node_marker, n_nodes)
         self.node_2d_marker = self._expand_param(node_2d_marker, n_nodes)
         self.node_alpha = self._expand_param(node_alpha, n_nodes)
+        self.node_edgecolor = self._expand_param(node_edgecolor, n_nodes)
+        self.node_edgewidth = self._expand_param(node_edgewidth, n_nodes)
 
         n_edges = len(graph.edges)
         self.edge_alpha = self._expand_param(edge_alpha, n_edges)
         self.edge_color = self._expand_param(edge_color, n_edges)
         self.plane_alpha = self._expand_param(plane_alpha, 1)[0]
+        self.plane_color = plane_color
+        self.label_fontsize = label_fontsize
+        self.plane_label_fontsize = plane_label_fontsize
+        self.label_fontfamily = label_fontfamily
 
         self.node_label = node_label if node_label is not None else {}
         self.edge_label = edge_label if edge_label is not None else {}
@@ -200,14 +216,18 @@ class LayeredNetworkGraph:
     def __init__(self, layers, interlayer_edges=None, ax=None):
         self.layers = layers
         self.interlayer_edges = interlayer_edges if interlayer_edges is not None else []
-        if ax:
-            self.ax = ax
-        else:
+        self.ax = ax
+
+    def _ensure_3d_ax(self):
+        """Create a 3D axes only when drawing in 3D, so 2D-only cells do not emit an extra figure."""
+        if self.ax is None:
             fig = plt.figure(figsize=(10, 10))
             self.ax = fig.add_subplot(111, projection='3d')
+        return self.ax
 
     def draw(self):
         """Draws the entire multi-layer network."""
+        self._ensure_3d_ax()
         for i,layer in enumerate(self.layers):
             if layer.z_pos is None:
                 layer.z_pos = i # Default z position based on the layer index
@@ -233,8 +253,14 @@ class LayeredNetworkGraph:
         node_sizes = [layer.node_size[node] if isinstance(layer.node_size, dict) else layer.node_size[i] for i, node in enumerate(nodes)]
         node_markers = [layer.node_marker[node] if isinstance(layer.node_marker, dict) else layer.node_marker[i] for i, node in enumerate(nodes)]
         node_alphas = [layer.node_alpha[node] if isinstance(layer.node_alpha, dict) else layer.node_alpha[i] for i, node in enumerate(nodes)]
+        node_edgecolors = [layer.node_edgecolor[node] if isinstance(layer.node_edgecolor, dict) else layer.node_edgecolor[i] for i, node in enumerate(nodes)]
 
-        mscatter3d(x, y, z, ax=self.ax, m=node_markers, c=node_colors, s=node_sizes, alpha=node_alphas, zorder=99)
+        mscatter3d(
+            x, y, z, ax=self.ax, m=node_markers, c=node_colors, s=node_sizes,
+            alpha=node_alphas, zorder=99,
+            edgecolors=node_edgecolors, linewidths=layer.node_edgewidth,
+            depthshade=False,
+        )
 
     def _draw_edges_within_layer(self, layer):
         segments = [(layer.node_positions[u], layer.node_positions[v]) for u, v in layer.graph.edges()]
@@ -262,8 +288,13 @@ class LayeredNetworkGraph:
                     color_text = layer.text_color[node] if isinstance(layer.text_color, dict) else layer.text_color
                 else:
                     color_text = 'black' if np.mean(mcolors.to_rgb(layer.node_color[node])) > 0.5 else 'white'
-                self.ax.text(*layer.node_positions[node], label,
-                             horizontalalignment='center', verticalalignment='center', color=color_text, zorder=100)
+                text_kw = dict(
+                    horizontalalignment='center', verticalalignment='center',
+                    color=color_text, zorder=100, fontsize=layer.label_fontsize,
+                )
+                if layer.label_fontfamily:
+                    text_kw['fontfamily'] = layer.label_fontfamily
+                self.ax.text(*layer.node_positions[node], label, **text_kw)
 
     def _draw_edge_labels(self, layer):
         for (u, v), label in layer.edge_label.items():
@@ -320,19 +351,41 @@ class LayeredNetworkGraph:
         W = layer.z_pos * np.ones_like(U)
         # if layer.plane_alpha exists, use it, otherwise default to 0.1
         alpha = getattr(layer, 'plane_alpha', 0.1)
-        self.ax.plot_surface(U, V, W, alpha=alpha, zorder=1, *args, **kwargs)
+        plane_color = getattr(layer, 'plane_color', None)
+        # 3D plot_surface often ignores `color=` and maps Z through a colormap
+        # (the yellow planes). Paint with an explicit RGBA facecolor array.
+        surface_kw = dict(shade=False, linewidth=0, antialiased=True, zorder=1)
+        if plane_color is not None:
+            rgba = mcolors.to_rgba(plane_color, alpha=alpha)
+            facecolors = np.empty(U.shape + (4,), dtype=float)
+            facecolors[:] = rgba
+            surface_kw['facecolors'] = facecolors
+        else:
+            surface_kw['alpha'] = alpha
+        kwargs = {k: v for k, v in kwargs.items() if k not in ('color', 'cmap', 'facecolors', 'alpha')}
+        surface_kw.update(kwargs)
+        self.ax.plot_surface(U, V, W, *args, **surface_kw)
         if layer.label:
             label_pos = layer.label_pos
             if label_pos is not None:
                 xmin, ymin = label_pos
             label_zdir = layer.label_zdir
-            self.ax.text(xmin, ymin, layer.z_pos, layer.label,
-                         horizontalalignment='left', verticalalignment='top', fontsize=14, zdir=label_zdir)
+            plane_text_kw = dict(
+                horizontalalignment='left', verticalalignment='top',
+                fontsize=getattr(layer, 'plane_label_fontsize', 14),
+                zdir=label_zdir,
+            )
+            if getattr(layer, 'label_fontfamily', None):
+                plane_text_kw['fontfamily'] = layer.label_fontfamily
+            self.ax.text(xmin, ymin, layer.z_pos, layer.label, **plane_text_kw)
 
     def draw_2d(self, ax=None, interlayer_edges_2d=None):
         """Draws all layers flattened into a single 2D plot."""
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 10))
+        # Do not leave a constructor/3D figure open; Jupyter would display it too.
+        if self.ax is not None and self.ax is not ax:
+            plt.close(self.ax.get_figure())
 
         for layer in self.layers:
             if layer.node_positions is None:
@@ -505,3 +558,139 @@ def top_k_partners(
         .group_by(col_name, maintain_order=True)
         .head(k)
     )
+
+
+PLANE_COLORS = ("#4c9ad6", "#5aa33a", "#e07050", "#8b62c4")  # cycle if more than 4 layers
+EDGE_CMAP = mcolors.LinearSegmentedColormap.from_list(
+    "blue_white_red",
+    ["#2166ac", "#ffffff", "#b2182b"],
+)
+
+
+def _vivid_node_color(i: int) -> str:
+    r, g, b, _ = plt.cm.tab10(i % 10)
+    hsv = mcolors.rgb_to_hsv((r, g, b))
+    hsv[1] = min(1.0, float(hsv[1]) * 1.25)
+    hsv[2] = min(0.82, float(hsv[2]) * 0.88)
+    return mcolors.to_hex(mcolors.hsv_to_rgb(hsv))
+
+
+def _shared_circular_layout(issuers: list[str]):
+    n = max(len(issuers), 1)
+    angles = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
+    xy = {s: (float(np.cos(a)), float(np.sin(a))) for s, a in zip(issuers, angles)}
+
+    def layout(G, *args, **kwargs):
+        return {node: xy[node] for node in G.nodes()}
+
+    return layout
+
+
+def _intra_graph(G, term: str):
+    H = nx.Graph()
+    for u, v, data in G.edges(data=True):
+        if data.get("layer") == "inter":
+            continue
+        if not (isinstance(u, tuple) and isinstance(v, tuple)):
+            continue
+        if u[1] != term or v[1] != term:
+            continue
+        H.add_edge(u[0], v[0], weight=float(data.get("weight", 0.5)))
+    for n in G.nodes():
+        if isinstance(n, tuple) and n[1] == term:
+            H.add_node(n[0])
+    return H
+
+
+def _edge_weights(H) -> list[float]:
+    return [float(d.get("weight", 0.5)) for _, _, d in H.edges(data=True)]
+
+
+def _edge_colors(weights: list[float], vmin: float, vmax: float) -> list[str]:
+    if not weights:
+        return []
+    span = vmax - vmin if vmax > vmin else 1.0
+    cmap = EDGE_CMAP
+    colors = []
+    for w in weights:
+        t = float(np.clip((w - vmin) / span, 0.0, 1.0))
+        colors.append(mcolors.to_hex(cmap(t)))
+    return colors
+
+
+def plot_multilayer_netviz(
+    G,
+    terms: list[str],
+    title: str = "Yield-curve multiplex",
+    layer_gap: float = 5.4,
+):
+    """Draw a 3D multiplex with one Layer per term. Plane colors cycle after 4 layers."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.figure import Figure
+
+    issuers = sorted({n[0] for n in G.nodes() if isinstance(n, tuple)})
+    layout = _shared_circular_layout(issuers)
+    graphs = [_intra_graph(G, term) for term in terms]
+    all_w = np.asarray([w for H in graphs for w in _edge_weights(H)], dtype=float)
+    if all_w.size:
+        # Clip outliers so the colormap is spent on typical weights, not the extremes.
+        wmin, wmax = np.percentile(all_w, [10, 90])
+        if wmax <= wmin:
+            wmin, wmax = float(all_w.min()), float(all_w.max())
+    else:
+        wmin, wmax = 0.0, 1.0
+
+    layers = []
+    for i, (term, H) in enumerate(zip(terms, graphs)):
+        node_color = {s: _vivid_node_color(issuers.index(s)) for s in H.nodes()}
+        layers.append(
+            Layer(
+                H,
+                z_pos=float(i) * layer_gap,
+                label=term,
+                layout=layout,
+                node_size=42,
+                node_color=node_color,
+                text_color={s: "black" for s in H.nodes()},
+                edge_color=_edge_colors(_edge_weights(H), wmin, wmax) or "dimgrey",
+                node_label={s: s for s in H.nodes()},
+                node_alpha=1.0,
+                edge_alpha=0.9,
+                plane_alpha=0.5,
+                plane_color=PLANE_COLORS[i % len(PLANE_COLORS)],
+                label_fontsize=6,
+                plane_label_fontsize=8,
+                label_fontfamily="Arial",
+                node_edgecolor="black",
+                node_edgewidth=1.15,
+            )
+        )
+
+    interlayer = []
+    for i in range(len(terms) - 1):
+        common = set(layers[i].graph.nodes()) & set(layers[i + 1].graph.nodes())
+        for s in common:
+            interlayer.append((s, s, i, i + 1))
+
+    fig = Figure(figsize=(8.8, 7.2))
+    FigureCanvasAgg(fig)
+    ax = fig.add_subplot(111, projection="3d")
+    viz = LayeredNetworkGraph(layers, interlayer_edges=interlayer, ax=ax)
+    viz.draw()
+    ax.set_title(title, fontsize=11, fontfamily="Arial", pad=2)
+    ax.set_axis_off()
+    z_span = max((len(terms) - 1) * layer_gap, 1.0)
+    ax.set_box_aspect((1.0, 1.0, 2.0))
+    ax.set_zlim(-0.35 * layer_gap, z_span + 0.35 * layer_gap)
+
+    sm = ScalarMappable(cmap=EDGE_CMAP, norm=Normalize(vmin=wmin, vmax=wmax))
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, shrink=0.5, pad=0.02, fraction=0.03)
+    cbar.set_label("Intra-layer connection strength", fontfamily="Arial", fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+    for tick in cbar.ax.get_yticklabels():
+        tick.set_fontfamily("Arial")
+    fig.subplots_adjust(left=0.02, right=0.90, top=0.94, bottom=0.02)
+    return fig, ax
+

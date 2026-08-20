@@ -85,3 +85,4 @@ runs/
 # ignore MultiLayerNetViz_Chapter folder
 MultiLayerNetViz_Chapter/
 old/
+resources/data/multilayer_network.pkl
