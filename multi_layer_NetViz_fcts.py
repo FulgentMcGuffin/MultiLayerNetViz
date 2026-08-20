@@ -23,7 +23,15 @@ import matplotlib.markers as mmarkers
 from collections import defaultdict
 
 
-plt.rcParams.update({'text.usetex': True, 'font.family': 'serif', 'font.size': 12})
+# Use matplotlib mathtext (Computer Modern) instead of system LaTeX.
+# `text.usetex=True` requires a working latex + dvipng toolchain and fails
+# if MiKTeX tries to auto-install packages during matplotlib's font probe.
+plt.rcParams.update({
+    'text.usetex': False,
+    'font.family': 'serif',
+    'font.size': 12,
+    'mathtext.fontset': 'cm',
+})
 
 def mscatter3d(x, y, z, ax=None, m=None, vmin=None, vmax=None, **kw):
     """
